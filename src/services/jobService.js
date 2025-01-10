@@ -1,37 +1,35 @@
-const axios = require('axios');
-const Crypto = require('../models/cryptoModel');
 const cron = require('node-cron');
+const axios = require('axios');
+const Crypto = require('../models/Crypto');
 
-const COINS = ['bitcoin', 'matic-network', 'ethereum'];
+const coins = ['bitcoin', 'matic-network', 'ethereum'];
 
 const fetchCryptoData = async () => {
   try {
-    for (const coin of COINS) {
-      const { data } = await axios.get(`https://api.coingecko.com/api/v3/simple/price`, {
-        params: {
-          ids: coin,
-          vs_currencies: 'usd',
-          include_market_cap: 'true',
-          include_24hr_change: 'true',
-        },
-      });
+    const responses = await Promise.all(
+      coins.map(coin => 
+        axios.get(`https://api.coingecko.com/api/v3/coins/${coin}`)
+      )
+    );
 
-      const details = data[coin];
-      const crypto = new Crypto({
-        coin,
-        price: details.usd,
-        marketCap: details.usd_market_cap,
-        change24h: details.usd_24h_change,
-      });
-      await crypto.save();
-    }
-    console.log('Crypto data fetched and stored.');
-  } catch (error) {
-    console.error('Error fetching data:', error);
+    const cryptoData = responses.map(res => ({
+      coin: res.data.id,
+      price: res.data.market_data.current_price.usd,
+      marketCap: res.data.market_data.market_cap.usd,
+      change24h: res.data.market_data.price_change_percentage_24h,
+    }));
+
+    // Store data in the database
+    await Crypto.insertMany(cryptoData);
+
+    console.log('Crypto data fetched and saved:', cryptoData);
+  } catch (err) {
+    console.error('Error fetching crypto data:', err.message);
   }
 };
 
 // Schedule the job to run every 2 hours
 cron.schedule('0 */2 * * *', fetchCryptoData);
+// cron.schedule('*/2 * * * *', fetchCryptoData);
 
-module.exports = fetchCryptoData;
+module.exports = { fetchCryptoData };
