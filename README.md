@@ -1,4 +1,4 @@
-# crypto-stats
+# Crypto-Stats
  
 ## Please follow below steps to run the code:
 
